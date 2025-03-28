@@ -1244,7 +1244,7 @@
             });
             
             // Add the first property immediately
-            if (propertyAddQueue.length > 0 && Date.now() - lastPropertyAddedTime >= 5000) {
+            if (propertyAddQueue.length > 0 && Date.now() - lastPropertyAddedTime >= 5001) {
                 const property = propertyAddQueue.shift();
                 lastAddedCity = getCityFromAddress(property);
                 addPropertyDirectly(property);
@@ -1264,8 +1264,8 @@
         function processPropertyQueue() {
             if (propertyAddQueue.length > 0) {
                 const now = Date.now();
-                // Only add a property if it's been at least 5000ms (5 seconds) since the last one
-                if (now - lastPropertyAddedTime >= 5000) {
+                // Only add a property if it's been at least 5001ms (5 seconds) since the last one
+                if (now - lastPropertyAddedTime >= 5001) {
                     // Find a property from a different city than the last one added
                     let propertyIndex = -1;
                     let selectedProperty = null;
