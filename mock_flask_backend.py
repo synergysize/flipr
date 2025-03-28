@@ -147,4 +147,5 @@ def system_status():
 if __name__ == '__main__':
     print(f"Starting Flask backend server on http://127.0.0.1:5000")
     print(f"Data file location: {os.path.abspath(DATA_FILE) if os.path.exists(DATA_FILE) else 'Not created yet'}")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
+
