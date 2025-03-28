@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -598,7 +599,7 @@
         
         .tab-content {
             position: fixed;
-            right: -300px;
+            right: -300px; /* Start offscreen */
             background: var(--tab-bg);
             box-shadow: -2px 2px 8px rgba(0,0,0,0.15);
             border-top-left-radius: 8px;
@@ -607,10 +608,11 @@
             transition: right 0.3s ease;
             z-index: 998;
             backdrop-filter: blur(4px);
+            width: 250px; /* Fixed width */
         }
         
         .tab-content.visible {
-            right: 0;
+            right: 0; /* Slide in when visible */
         }
         
         .social-content {
@@ -786,7 +788,7 @@
             <div class="side-tab social-tab" onclick="toggleTab('social-content')">
                 <i class="fas fa-share-alt"></i>
             </div>
-            <div class="tab-content social-content" id="social-content">
+            <div class="tab-content" id="social-content" style="top: 120px;">
                 <div class="social-icon" title="Dextools">
                     <i class="fas fa-chart-line"></i>
                 </div>
@@ -805,7 +807,7 @@
             <div class="side-tab contract-tab" onclick="toggleTab('contract-content')">
                 <i class="fas fa-file-contract"></i>
             </div>
-            <div class="tab-content contract-content" id="contract-content">
+            <div class="tab-content" id="contract-content" style="top: 180px;">
                 <div class="contract-address" onclick="copyToClipboard('0x1234567890abcdef1234567890abcdef12345678')">
                     0x1234567890abcdef1234567890abcdef12345678
                 </div>
@@ -1002,66 +1004,7 @@
             loadProperties();
             
             // Generate mockup data and simulate property incoming over socket
-            setTimeout(() => {
-                try {
-                    const totalMockProperties = 45; // 15 cities x 3 properties each
-                    
-                    // First, reset everything
-                    propertyAddQueue = [];
-                    clearMarkers();
-                    propertiesData = []; 
-                    lastAddedCity = null;
-                    
-                    // Signal that we're using mock data
-                    addLogEntry("Using mock data to demonstrate city-based property distribution...");
-                    
-                    // Create all properties at once
-                    const allMockData = generateMockProperties();
-                    
-                    // Add them one at a time to simulate socket events
-                    let mockPropertyIndex = 0;
-                    
-                    // Add the first one now
-                    if (allMockData.length > 0) {
-                        const firstProperty = allMockData[0];
-                        propertiesData.push(firstProperty);
-                        addPropertyToMap(firstProperty);
-                        mockPropertyIndex++;
-                        
-                        // Update stats
-                        updateUIStats();
-                    }
-                    
-                    // Function to add more properties every 1 second
-                    function addAnotherMockProperty() {
-                        if (mockPropertyIndex < allMockData.length) {
-                            const property = allMockData[mockPropertyIndex];
-                            propertiesData.push(property);
-                            
-                            // Simulate new_property socket event
-                            addPropertyToMap(property);
-                            updateUIStats();
-                            
-                            // Add log message like a socket event
-                            // Show AI thought process for mock properties
-                            addLogEntry(generateAIThoughtProcess(property));
-                            
-                            // Increment for next time
-                            mockPropertyIndex++;
-                            
-                            // Schedule the next property addition
-                            setTimeout(addAnotherMockProperty, 1000);
-                        }
-                    }
-                    
-                    // Start the property addition sequence after a short delay
-                    setTimeout(addAnotherMockProperty, 1000);
-                    
-                } catch (error) {
-                    console.error("Error setting up mock data:", error);
-                    addLogEntry("Error loading mock data: " + error.message);
-                }
-            }, 2000);
+            
             
             // Helper function to update UI stats directly
             function updateUIStats() {
@@ -1142,7 +1085,7 @@
         // Connect to WebSocket for real-time updates
         function connectWebSocket() {
             try {
-                socket = io('https://your-app.onrender.com');
+                socket = io('http://localhost:5001');
                 
                 socket.on('connect', () => {
                     document.getElementById('connection-status-text').textContent = 'Connected (Live Updates)';
@@ -1177,7 +1120,7 @@
         
         // Load properties from API
         function loadProperties() {
-            fetch('https://your-app.onrender.com/properties')
+            fetch('http://localhost:5001/properties')
                 .then(response => response.json())
                 .then(data => {
                     propertiesData = data;
@@ -1244,7 +1187,7 @@
             });
             
             // Add the first property immediately
-            if (propertyAddQueue.length > 0 && Date.now() - lastPropertyAddedTime >= 5001) {
+            if (propertyAddQueue.length > 0 && Date.now() - lastPropertyAddedTime >= 5000) {
                 const property = propertyAddQueue.shift();
                 lastAddedCity = getCityFromAddress(property);
                 addPropertyDirectly(property);
@@ -1264,8 +1207,8 @@
         function processPropertyQueue() {
             if (propertyAddQueue.length > 0) {
                 const now = Date.now();
-                // Only add a property if it's been at least 5001ms (5 seconds) since the last one
-                if (now - lastPropertyAddedTime >= 5001) {
+                // Only add a property if it's been at least 5000ms (5 seconds) since the last one
+                if (now - lastPropertyAddedTime >= 5000) {
                     // Find a property from a different city than the last one added
                     let propertyIndex = -1;
                     let selectedProperty = null;
