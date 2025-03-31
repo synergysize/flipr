@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
+
 import json
 import os
 import time
@@ -50,7 +51,7 @@ def init_db():
 # API routes
 @app.route('/')
 def serve_map():
-    return send_from_directory('.', 'map_redesign.html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/update', methods=['POST'])
 def update_property():
