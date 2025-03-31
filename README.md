@@ -39,20 +39,30 @@ Invalid DATABASE_URL format: DATABASE_URL=postgresql://postgres:zP8@m$Kd2L#qF*v7
    port = result.port or 5432  # Use default PostgreSQL port if none specified
    ```
 
-4. **Input Validation**: Added validation of the DATABASE_URL format
+4. **Relaxed URL Validation**: Simplified URL validation to handle URLs with special characters
    ```python
-   if not (result.scheme in ['postgresql', 'postgres'] and result.username and result.path):
-       logging.warning(f"Invalid DATABASE_URL format: {DB_URL}")
-       logging.warning("URL should be in format: postgres://username:password@hostname:port/database")
-       DB_URL = ""
+   # Just check that it starts with postgres:// or postgresql:// and has at least one /@
+   if (DB_URL.startswith('postgres://') or DB_URL.startswith('postgresql://')) and '@' in DB_URL:
+       logging.info(f"Database URL format seems valid, proceeding with connection attempt")
    ```
 
-5. **Better Error Handling**: Improved error handling for database connections with better logging
+5. **Direct Connection First**: Try connecting directly with the URL before parsing components
+   ```python
+   try:
+       # Try direct connection with the URL first
+       logging.info("Attempting direct connection with the DATABASE_URL")
+       conn = psycopg2.connect(DB_URL)
+       return conn
+   except Exception as direct_err:
+       # If direct connection fails, fall back to parsing the URL...
+   ```
+
+6. **Better Error Handling**: Improved error handling for database connections with better logging
    ```python
    logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
    ```
 
-6. **Automatic Fallback**: Added fallback mechanism to automatically switch to SQLite if PostgreSQL connection fails
+7. **Automatic Fallback**: Added fallback mechanism to automatically switch to SQLite if PostgreSQL connection fails
    ```python
    try:
        # PostgreSQL initialization code...
@@ -63,13 +73,13 @@ Invalid DATABASE_URL format: DATABASE_URL=postgresql://postgres:zP8@m$Kd2L#qF*v7
        # Initialize SQLite instead...
    ```
 
-7. **Environment Variable Loading**: Added dotenv support to load environment variables from a .env file
+8. **Environment Variable Loading**: Added dotenv support to load environment variables from a .env file
    ```python
    from dotenv import load_dotenv
    load_dotenv()
    ```
 
-8. **Port Configuration**: Changed the default port to avoid conflicts
+9. **Port Configuration**: Changed the default port to avoid conflicts
    ```python
    port = int(os.environ.get("PORT", 5005))
    ```

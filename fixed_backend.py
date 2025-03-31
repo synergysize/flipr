@@ -52,9 +52,14 @@ if DB_URL:
     
     # Validate DATABASE_URL format
     try:
-        result = urllib.parse.urlparse(DB_URL)
-        # Check if the URL has the minimum required components
-        if not (result.scheme in ['postgresql', 'postgres'] and result.username and result.path):
+        # Special handling for URLs with special characters
+        # We don't want to be too strict here - if the URL has the basic format, we'll accept it
+        # and rely on the more detailed validation in get_db_connection
+        
+        # Just check that it starts with postgres:// or postgresql:// and has at least one /@
+        if (DB_URL.startswith('postgres://') or DB_URL.startswith('postgresql://')) and '@' in DB_URL:
+            logging.info(f"Database URL format seems valid, proceeding with connection attempt")
+        else:
             logging.warning(f"Invalid DATABASE_URL format: {DB_URL}")
             logging.warning("URL should be in format: postgres://username:password@hostname:port/database")
             DB_URL = ""
@@ -72,29 +77,43 @@ def get_db_connection():
     """Get database connection (either PostgreSQL or SQLite)"""
     if USE_POSTGRES:
         try:
-            # Parse the DATABASE_URL to extract components
-            result = urllib.parse.urlparse(DB_URL)
-            
-            # Extract components with defaults for missing values
-            username = result.username or 'postgres'  # Default username
-            password = result.password  # Password can be None
-            database = result.path[1:] if result.path else None  # Remove the leading '/'
-            hostname = result.hostname or 'localhost'  # Default to localhost if hostname is None
-            port = result.port or 5432  # Use default PostgreSQL port if none specified
-            
-            # Validate essential components
-            if not database:
-                raise ValueError("Database name is missing in DATABASE_URL")
-            
-            # Create a proper connection string for PostgreSQL with proper handling of None values
-            conn_string = f"host={hostname} port={port} dbname={database} user={username}"
-            if password:
-                conn_string += f" password={password}"
-            conn_string += " sslmode=require"
-            
-            # Connect using the parsed parameters
-            conn = psycopg2.connect(conn_string)
-            return conn
+            # For complex URLs with special characters, try connecting directly with the URL
+            # This is more reliable than parsing the URL ourselves
+            try:
+                # Try direct connection with the URL first
+                logging.info("Attempting direct connection with the DATABASE_URL")
+                conn = psycopg2.connect(DB_URL)
+                return conn
+            except Exception as direct_err:
+                # If direct connection fails, try parsing the URL and connecting with components
+                logging.warning(f"Direct connection failed: {str(direct_err)}")
+                logging.info("Trying to parse URL components and connect manually")
+                
+                # Parse the DATABASE_URL to extract components
+                result = urllib.parse.urlparse(DB_URL)
+                
+                # Extract components with defaults for missing values
+                username = result.username or 'postgres'  # Default username
+                password = result.password  # Password can be None
+                database = result.path[1:] if result.path else None  # Remove the leading '/'
+                hostname = result.hostname or 'localhost'  # Default to localhost if hostname is None
+                port = result.port or 5432  # Use default PostgreSQL port if none specified
+                
+                # Validate essential components
+                if not database:
+                    raise ValueError("Database name is missing in DATABASE_URL")
+                
+                # Create a proper connection string for PostgreSQL with proper handling of None values
+                conn_string = f"host={hostname} port={port} dbname={database} user={username}"
+                if password:
+                    conn_string += f" password={password}"
+                conn_string += " sslmode=require"
+                
+                logging.info(f"Connecting with parameters - host: {hostname}, port: {port}, dbname: {database}, user: {username}")
+                
+                # Connect using the parsed parameters
+                conn = psycopg2.connect(conn_string)
+                return conn
         except Exception as e:
             logging.error(f"Error connecting to PostgreSQL: {str(e)}")
             raise
