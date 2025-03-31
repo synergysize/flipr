@@ -34,7 +34,9 @@ WALK_SCORE_ENDPOINT = "http://api.walkscore.com/score"
 OXYLABS_ENDPOINT = "https://realtime.oxylabs.io/v1/queries"
 
 # Use port 5001 for the live backend
-FLASK_BACKEND_ENDPOINT = "http://localhost:5001/update"
+# Check for environment variable, default to localhost in development
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:5001")
+FLASK_BACKEND_ENDPOINT = f"{BACKEND_URL}/update"
 CURRENT_YEAR = datetime.now().year
 
 headers_attom = {"apikey": ATTOM_API_KEY, "Accept": "application/json"}
