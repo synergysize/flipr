@@ -1079,9 +1079,9 @@
         ];
         
         // Connect to WebSocket for real-time updates
-        function connectWebSocket() {
-            try {
-                socket = io('http://localhost:5001');
+         function connectWebSocket() {
+             try {
+                socket = io(window.location.origin);
                 
                 socket.on('connect', () => {
                     document.getElementById('connection-status-text').textContent = 'Connected (Live Updates)';
