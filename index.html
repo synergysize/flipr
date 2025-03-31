@@ -1078,10 +1078,20 @@
             { name: "Charlotte", state: "NC", lat: 35.2271, lng: -80.8431 }
         ];
         
+        // Backend URL configuration
+        const BACKEND_URL = 'https://flipr-backend.onrender.com'; // Replace with your Render backend URL
+        
+        // For local development, uncomment this line and comment the one above
+        // const BACKEND_URL = 'http://localhost:5001';
+
         // Connect to WebSocket for real-time updates
          function connectWebSocket() {
              try {
-                socket = io(window.location.origin);
+                // Use the backend URL for socket.io connection
+                socket = io(BACKEND_URL, {
+                    transports: ['websocket', 'polling'],
+                    withCredentials: true 
+                });
                 
                 socket.on('connect', () => {
                     document.getElementById('connection-status-text').textContent = 'Connected (Live Updates)';
@@ -1157,7 +1167,7 @@
             // CRITICAL: Save existing markers before loading
             const savedMarkers = [...markers];
             
-            fetch('/properties')
+            fetch(`${BACKEND_URL}/properties`)
                 .then(response => response.json())
                 .then(data => {
                     // On page initial load, we need to clear and add markers
@@ -1874,7 +1884,7 @@
             // Load property data but preserve existing markers
             setTimeout(() => {
                 // Use a modified version of loadProperties that doesn't clear markers
-                fetch('/properties')
+                fetch(`${BACKEND_URL}/properties`)
                     .then(response => response.json())
                     .then(data => {
                         // Update data but DON'T call clearMarkers() - explicitly preserve markers

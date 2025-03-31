@@ -33,10 +33,13 @@ RENTCAST_ENDPOINT = "https://api.rentcast.io/v1/properties"
 WALK_SCORE_ENDPOINT = "http://api.walkscore.com/score"
 OXYLABS_ENDPOINT = "https://realtime.oxylabs.io/v1/queries"
 
-# Use port 5001 for the live backend
-# Check for environment variable, default to localhost in development
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:5001")
+# Backend configuration
+# Check for environment variable, use proper Render URL in production
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://flipr-backend.onrender.com")
 FLASK_BACKEND_ENDPOINT = f"{BACKEND_URL}/update"
+
+# For local development, uncomment the line below
+# BACKEND_URL = "http://localhost:5001"
 CURRENT_YEAR = datetime.now().year
 
 headers_attom = {"apikey": ATTOM_API_KEY, "Accept": "application/json"}
