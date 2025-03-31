@@ -38,7 +38,21 @@ CORS(app, origins=ALLOWED_ORIGINS)
 socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
 
 # Get from environment variable
-DB_URL = os.environ.get("DATABASE_URL", "")  
+DB_URL = os.environ.get("DATABASE_URL", "")
+
+# Validate DATABASE_URL if it's set
+if DB_URL:
+    try:
+        result = urllib.parse.urlparse(DB_URL)
+        # Check if the URL has the minimum required components
+        if not (result.scheme in ['postgresql', 'postgres'] and result.username and result.path):
+            logging.warning(f"Invalid DATABASE_URL format: {DB_URL}")
+            logging.warning("URL should be in format: postgres://username:password@hostname:port/database")
+            DB_URL = ""
+    except Exception as e:
+        logging.warning(f"Error parsing DATABASE_URL: {str(e)}")
+        DB_URL = ""
+
 # Fallback to SQLite for development if no PostgreSQL URL is provided
 USE_POSTGRES = bool(DB_URL)
 # Log connection method being used
@@ -51,14 +65,23 @@ def get_db_connection():
         try:
             # Parse the DATABASE_URL to extract components
             result = urllib.parse.urlparse(DB_URL)
-            username = result.username
-            password = result.password
-            database = result.path[1:]  # Remove the leading '/'
-            hostname = result.hostname
+            
+            # Extract components with defaults for missing values
+            username = result.username or 'postgres'  # Default username
+            password = result.password  # Password can be None
+            database = result.path[1:] if result.path else None  # Remove the leading '/'
+            hostname = result.hostname or 'localhost'  # Default to localhost if hostname is None
             port = result.port or 5432  # Use default PostgreSQL port if none specified
             
-            # Create a proper connection string for PostgreSQL
-            conn_string = f"host={hostname} port={port} dbname={database} user={username} password={password} sslmode=require"
+            # Validate essential components
+            if not database:
+                raise ValueError("Database name is missing in DATABASE_URL")
+            
+            # Create a proper connection string for PostgreSQL with proper handling of None values
+            conn_string = f"host={hostname} port={port} dbname={database} user={username}"
+            if password:
+                conn_string += f" password={password}"
+            conn_string += " sslmode=require"
             
             # Connect using the parsed parameters
             conn = psycopg2.connect(conn_string)

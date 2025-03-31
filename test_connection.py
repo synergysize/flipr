@@ -25,18 +25,46 @@ def test_url_parsing():
         "postgresql://user:pass@hostname/dbname",                  # postgresql scheme
         "postgresql://user@hostname/dbname",                       # No password
         "postgresql://user:pass@/dbname",                          # No hostname (localhost)
+        "postgresql://user:pass@:5432/dbname",                     # Empty hostname
+        "postgres:///dbname",                                      # No auth info or hostname
+        "postgres://:@/dbname",                                    # Empty username and password
+        "DATABASE_URL=postgres://user:pass@hostname:5432/dbname",  # Common mistake including var name
     ]
     
     for i, url in enumerate(urls):
         print(f"Test {i+1}: {url}")
+        
+        # Check for common mistake of including variable name
+        if url.startswith("DATABASE_URL="):
+            url = url.split("=", 1)[1]
+            print(f"  Corrected URL: {url}")
+            
         result = urllib.parse.urlparse(url)
         
-        # Extract components
-        username = result.username
-        password = result.password
-        database = result.path[1:]  # Remove the leading '/'
+        # Extract components with validation
+        username = result.username or "postgres"  # Default username
+        password = result.password  # Password can be None
+        database = result.path[1:] if result.path else ""  # Remove the leading '/'
         hostname = result.hostname or "localhost"  # Default to localhost if None
         port = result.port or 5432   # Default to 5432 if None
+        
+        # Validation of minimum requirements
+        valid = True
+        errors = []
+        
+        if not (result.scheme in ['postgresql', 'postgres']):
+            valid = False
+            errors.append(f"Invalid scheme: {result.scheme}")
+            
+        if not database:
+            valid = False
+            errors.append("Missing database name")
+            
+        if not username:
+            errors.append("Username is empty (using default: postgres)")
+            
+        if not hostname:
+            errors.append("Hostname is empty (using default: localhost)")
         
         # Print parsed components
         print(f"  Username: {username}")
@@ -44,14 +72,24 @@ def test_url_parsing():
         print(f"  Database: {database}")
         print(f"  Hostname: {hostname}")
         print(f"  Port: {port}")
+        print(f"  Valid: {valid}")
+        
+        if errors:
+            print("  Validation errors:")
+            for error in errors:
+                print(f"   - {error}")
         
         # Create connection string
-        conn_string = f"host={hostname} port={port} dbname={database} user={username}"
-        if password:
-            conn_string += f" password={password}"
-        conn_string += " sslmode=require"
-        
-        print(f"  Connection string: {conn_string}")
+        if valid:
+            conn_string = f"host={hostname} port={port} dbname={database} user={username}"
+            if password:
+                conn_string += f" password={password}"
+            conn_string += " sslmode=require"
+            
+            print(f"  Connection string: {conn_string}")
+        else:
+            print("  Connection string: Not created due to validation errors")
+            
         print("")
 
 def test_env_url():
