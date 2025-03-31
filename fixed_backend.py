@@ -40,8 +40,17 @@ socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
 # Get from environment variable
 DB_URL = os.environ.get("DATABASE_URL", "")
 
-# Validate DATABASE_URL if it's set
+# Check for common mistakes in DATABASE_URL
 if DB_URL:
+    # Remove var name if someone included it (DATABASE_URL=)
+    if DB_URL.startswith("DATABASE_URL="):
+        DB_URL = DB_URL.split("=", 1)[1]
+        logging.info(f"Removed 'DATABASE_URL=' prefix from connection string")
+
+    # Fix newlines in the URL (common copy-paste issue)
+    DB_URL = DB_URL.replace("\n", "").replace("\r", "")
+    
+    # Validate DATABASE_URL format
     try:
         result = urllib.parse.urlparse(DB_URL)
         # Check if the URL has the minimum required components

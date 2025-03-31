@@ -29,14 +29,33 @@ def test_url_parsing():
         "postgres:///dbname",                                      # No auth info or hostname
         "postgres://:@/dbname",                                    # Empty username and password
         "DATABASE_URL=postgres://user:pass@hostname:5432/dbname",  # Common mistake including var name
+        # URL with a newline in the middle (common copy-paste error)
+        """postgresql://user:pass
+@hostname:5432/dbname""",
+        # URL with special characters in password
+        "postgresql://user:p@$$w0rd!@hostname:5432/dbname",
+        # Complex real-world example with special chars
+        "postgresql://postgres:zP8@m$Kd2L#qF*v7XrT9nH^Ew3Js!6B@db.example.supabase.co:5432/postgres",
+        # Complex example with newline (what we saw in the error)
+        """DATABASE_URL=postgresql://postgres:zP8@m$Kd2L#qF*v7XrT9nH^Ew3Js!6B
+@db.utalravvcgiehxojrgba.supabase.co:5432/postgres"""
     ]
     
     for i, url in enumerate(urls):
         print(f"Test {i+1}: {url}")
         
-        # Check for common mistake of including variable name
+        # Check for common mistakes and fix them
+        original_url = url
+        
+        # Remove variable name prefix if included
         if url.startswith("DATABASE_URL="):
             url = url.split("=", 1)[1]
+        
+        # Fix newlines in the URL (common copy-paste issue)
+        url = url.replace("\n", "").replace("\r", "")
+        
+        # Report corrections if any were made
+        if url != original_url:
             print(f"  Corrected URL: {url}")
             
         result = urllib.parse.urlparse(url)
@@ -102,14 +121,29 @@ def test_env_url():
         print("DATABASE_URL is not set in environment or .env file")
         return
     
-    print(f"DATABASE_URL from environment: {DB_URL}")
+    # Apply the same fixes as in the main application
+    original_url = DB_URL
+    
+    # Remove variable name prefix if included
+    if DB_URL.startswith("DATABASE_URL="):
+        DB_URL = DB_URL.split("=", 1)[1]
+    
+    # Fix newlines in the URL (common copy-paste issue)
+    DB_URL = DB_URL.replace("\n", "").replace("\r", "")
+    
+    # Report corrections if any were made
+    if DB_URL != original_url:
+        print(f"Original DATABASE_URL: {original_url}")
+        print(f"Corrected DATABASE_URL: {DB_URL}")
+    else:
+        print(f"DATABASE_URL from environment: {DB_URL}")
     
     result = urllib.parse.urlparse(DB_URL)
     
     # Extract components
-    username = result.username
-    password = result.password
-    database = result.path[1:]  # Remove the leading '/'
+    username = result.username or "postgres"  # Default username
+    password = result.password  # Password can be None
+    database = result.path[1:] if result.path else ""  # Remove the leading '/'
     hostname = result.hostname or "localhost"  # Default to localhost if None
     port = result.port or 5432   # Default to 5432 if None
     
