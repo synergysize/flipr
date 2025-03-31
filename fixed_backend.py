@@ -10,6 +10,10 @@ import uuid
 import psycopg2
 import psycopg2.extras
 import urllib.parse
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -37,6 +41,8 @@ socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
 DB_URL = os.environ.get("DATABASE_URL", "")  
 # Fallback to SQLite for development if no PostgreSQL URL is provided
 USE_POSTGRES = bool(DB_URL)
+# Log connection method being used
+logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 DB_FILE = "properties.db"
 
 def get_db_connection():
@@ -49,7 +55,7 @@ def get_db_connection():
             password = result.password
             database = result.path[1:]  # Remove the leading '/'
             hostname = result.hostname
-            port = result.port
+            port = result.port or 5432  # Use default PostgreSQL port if none specified
             
             # Create a proper connection string for PostgreSQL
             conn_string = f"host={hostname} port={port} dbname={database} user={username} password={password} sslmode=require"
@@ -68,9 +74,38 @@ def get_db_connection():
 def init_db():
     """Initialize database tables"""
     if USE_POSTGRES:
-        # PostgreSQL initialization
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
+        try:
+            # PostgreSQL initialization
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS properties (
+                        id TEXT PRIMARY KEY,
+                        address TEXT,
+                        lat REAL,
+                        lng REAL,
+                        price REAL,
+                        bedrooms INTEGER,
+                        bathrooms REAL,
+                        intensity REAL,
+                        deal_rating TEXT,
+                        ai_evaluation_reasoning TEXT,
+                        property_data JSONB,
+                        timestamp INTEGER
+                    )
+                    ''')
+                    conn.commit()
+            logging.info("PostgreSQL database initialized")
+        except Exception as e:
+            logging.error(f"Failed to initialize PostgreSQL database: {str(e)}")
+            logging.info("Falling back to SQLite database")
+            # Use nonlocal would be better but we're at module level
+            # Set the global variable to switch to SQLite
+            globals()['USE_POSTGRES'] = False
+            # Initialize SQLite instead
+            import sqlite3
+            with sqlite3.connect(DB_FILE) as conn:
+                cursor = conn.cursor()
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS properties (
                     id TEXT PRIMARY KEY,
@@ -83,12 +118,12 @@ def init_db():
                     intensity REAL,
                     deal_rating TEXT,
                     ai_evaluation_reasoning TEXT,
-                    property_data JSONB,
+                    property_data TEXT,
                     timestamp INTEGER
                 )
                 ''')
                 conn.commit()
-        logging.info("PostgreSQL database initialized")
+            logging.info("SQLite database initialized (fallback mode)")
     else:
         # SQLite initialization (for development)
         import sqlite3
@@ -349,7 +384,8 @@ def handle_connect():
 if __name__ == '__main__':
     init_db()
     # Get port from environment variable for compatibility with hosting services
-    port = int(os.environ.get("PORT", 5001))
+    # Use a different port to avoid conflicts
+    port = int(os.environ.get("PORT", 5005))
     host = '0.0.0.0'
     logging.info(f"Starting fixed backend server on http://{host}:{port}")
     # Write PID to file for easy termination (in development)

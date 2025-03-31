@@ -1,58 +1,59 @@
-# Flipr - AI Property Evaluator
+# FlipR Backend Fix
 
-A real estate evaluation tool with AI-powered insights for property analysis.
+This directory contains a fixed version of the FlipR backend to address the PostgreSQL connection error:
 
-## Architecture
+```
+psycopg2.OperationalError: invalid integer value "None" for connection option "port"
+```
 
-This application uses a distributed architecture with:
+## What was fixed
 
-- Frontend: Hosted on Vercel
-- Backend: Flask server hosted on Render
-- Database: PostgreSQL hosted on Supabase
+1. **Port Default Value**: Added default port (5432) for PostgreSQL when no port is specified in the connection URL
+   ```python
+   port = result.port or 5432  # Use default PostgreSQL port if none specified
+   ```
 
-## Setup Instructions
+2. **Better Error Handling**: Improved error handling for database connections with better logging
+   ```python
+   logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
+   ```
 
-### Backend Setup (Render)
+3. **Automatic Fallback**: Added fallback mechanism to automatically switch to SQLite if PostgreSQL connection fails
+   ```python
+   try:
+       # PostgreSQL initialization code...
+   except Exception as e:
+       logging.error(f"Failed to initialize PostgreSQL database: {str(e)}")
+       logging.info("Falling back to SQLite database")
+       globals()['USE_POSTGRES'] = False
+       # Initialize SQLite instead...
+   ```
 
-1. Create a new Web Service on Render
-2. Link your GitHub repository
-3. Configure the build settings:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python fixed_backend.py`
-4. Set Environment Variables:
-   - `DATABASE_URL`: Your Supabase PostgreSQL connection string
-   - `PRODUCTION`: true
-   - Any API keys required
+4. **Environment Variable Loading**: Added dotenv support to load environment variables from a .env file
+   ```python
+   from dotenv import load_dotenv
+   load_dotenv()
+   ```
 
-### Database Setup (Supabase)
+5. **Port Configuration**: Changed the default port to avoid conflicts
+   ```python
+   port = int(os.environ.get("PORT", 5005))
+   ```
 
-1. Create a new Supabase project
-2. Create a new PostgreSQL database table named `properties`
-3. Copy your connection string for the Render setup
+## How to use
 
-### Frontend Setup (Vercel)
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1. Connect your repository to Vercel
-2. Deploy the frontend from the repository
+2. Configure database (optional):
+   - Edit the `.env` file to configure PostgreSQL connection
+   - By default, it will use SQLite
 
-## Local Development
+3. Run the application:
+   ```bash
+   python fixed_backend.py
+   ```
 
-1. Clone the repository
-2. Copy `.env.example` to `.env` and add your environment variables
-3. Install dependencies: `pip install -r requirements.txt`
-4. Update BACKEND_URL in index.html and ai_enhanced_property_lookup.py to your local server URL
-5. Run the server: `python fixed_backend.py`
-
-## Files Overview
-
-- `fixed_backend.py`: Flask backend server
-- `index.html`: Frontend interface
-- `ai_enhanced_property_lookup.py`: Property data lookup
-- `ai_property_evaluator.py`: AI evaluation logic
-- `requirements.txt`: Python dependencies
-
-## Important Configuration
-
-- CORS is configured to work with specific frontend domains
-- Socket.io is configured for real-time updates between frontend and backend
-- Database connections support both PostgreSQL (production) and SQLite (development)
+The application will run on port 5005 by default (http://localhost:5005).
