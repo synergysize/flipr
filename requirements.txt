@@ -1,6 +1,4 @@
-flask
+Flask
+Flask-Cors
+Flask-SocketIO
 requests
-pandas
-sqlalchemy
-sqlite3  # if you're using SQLite, otherwise remove
-numpy
