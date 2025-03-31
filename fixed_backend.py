@@ -9,6 +9,7 @@ import logging
 import uuid
 import psycopg2
 import psycopg2.extras
+import urllib.parse
 
 # Configure logging
 logging.basicConfig(
@@ -32,9 +33,8 @@ ALLOWED_ORIGINS = [
 CORS(app, origins=ALLOWED_ORIGINS)
 socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
 
-# Database configuration - Supabase PostgreSQL
-DB_URL = os.environ.get("DATABASE_URL", "")  # Get from environment variable
-
+# Get from environment variable
+DB_URL = os.environ.get("DATABASE_URL", "")  
 # Fallback to SQLite for development if no PostgreSQL URL is provided
 USE_POSTGRES = bool(DB_URL)
 DB_FILE = "properties.db"
@@ -43,7 +43,19 @@ def get_db_connection():
     """Get database connection (either PostgreSQL or SQLite)"""
     if USE_POSTGRES:
         try:
-            conn = psycopg2.connect(DB_URL)
+            # Parse the DATABASE_URL to extract components
+            result = urllib.parse.urlparse(DB_URL)
+            username = result.username
+            password = result.password
+            database = result.path[1:]  # Remove the leading '/'
+            hostname = result.hostname
+            port = result.port
+            
+            # Create a proper connection string for PostgreSQL
+            conn_string = f"host={hostname} port={port} dbname={database} user={username} password={password} sslmode=require"
+            
+            # Connect using the parsed parameters
+            conn = psycopg2.connect(conn_string)
             return conn
         except Exception as e:
             logging.error(f"Error connecting to PostgreSQL: {str(e)}")
