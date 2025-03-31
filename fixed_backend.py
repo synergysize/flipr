@@ -193,10 +193,21 @@ def handle_connect():
     logging.info(f"Client connected: {request.sid}")
     emit('connection_status', {'status': 'connected'})
 
+# Replace with:
 if __name__ == '__main__':
     init_db()
-    logging.info("Starting fixed backend server on http://0.0.0.0:5001")
-    # Write PID to file for easy termination
-    with open('backend.pid', 'w') as f:
-        f.write(str(os.getpid()))
-    socketio.run(app, host='0.0.0.0', port=5001, debug=True, allow_unsafe_werkzeug=True)
+    # Get port from environment variable for compatibility with hosting services
+    port = int(os.environ.get("PORT", 5001))
+    host = '0.0.0.0'
+    logging.info(f"Starting fixed backend server on http://{host}:{port}")
+    # Write PID to file for easy termination (in development)
+    try:
+        with open('backend.pid', 'w') as f:
+            f.write(str(os.getpid()))
+    except:
+        logging.warning("Could not write PID file (normal in production)")
+    # Run with production settings when deployed
+    if os.environ.get("PRODUCTION") == "true":
+        socketio.run(app, host=host, port=port, debug=False)
+    else:
+        socketio.run(app, host=host, port=port, debug=True, allow_unsafe_werkzeug=True)
