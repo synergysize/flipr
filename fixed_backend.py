@@ -449,6 +449,6 @@ if __name__ == '__main__':
         logging.warning("Could not write PID file (normal in production)")
     # Run with production settings when deployed
     if os.environ.get("PRODUCTION") == "true":
-        socketio.run(app, host=host, port=port, debug=False)
+        socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
     else:
         socketio.run(app, host=host, port=port, debug=True, allow_unsafe_werkzeug=True)
