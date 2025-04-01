@@ -33,7 +33,9 @@ ALLOWED_ORIGINS = [
     "https://app.flipr.realty",      # Production domain
     "http://app.flipr.realty",       # Production domain (http version)
     "http://localhost:3000",         # For local development
-    "http://localhost:5173"          # For local Vite development
+    "http://localhost:5173",          # For local Vite development
+    "https://flipr-5.onrender.com",
+    "https://flipr-6.onrender.com"
 ]
 
 CORS(app, origins=ALLOWED_ORIGINS)
