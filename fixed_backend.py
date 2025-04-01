@@ -228,6 +228,14 @@ def update_property():
             property_data['timestamp'] = int(time.time())
         
         # Extract standard fields
+    city = property_data.get('city')
+    state = property_data.get('state')
+    zip_code = property_data.get('zip')
+    square_feet = property_data.get('square_feet')
+    year_built = property_data.get('year_built')
+    lot_size = property_data.get('lot_size')
+    walk_score = property_data.get('walk_score')
+    property_type = property_data.get('property_type')
         prop_id = property_data.get('id')
         address = property_data.get('address', '')
         lat = property_data.get('lat')
@@ -241,7 +249,7 @@ def update_property():
         
         # Extra fields go to property_data
         extra_fields = {}
-        standard_fields = ['id', 'address', 'lat', 'lng', 'price', 'bedrooms', 
+        standard_fields = ['id', 'address', 'lat', 'lng', 'price', 'bedrooms', 'bathrooms', 'city', 'state', 'zip_code', 'square_feet', 'year_built', 'lot_size', 'walk_score', 'property_type', 
                           'bathrooms', 'intensity', 'deal_rating', 
                           'ai_evaluation_reasoning', 'timestamp']
         
