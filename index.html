@@ -1093,15 +1093,21 @@
                     withCredentials: true 
                 });
                 
-                socket.on('connect', () => {
-                    document.getElementById('connection-status-text').textContent = 'Connected (Live Updates)';
-                    addLogEntry("Real-time connection established with AI backend.");
-                });
+socket.on('connect', () => {
+    const statusElement = document.getElementById('connection-status-text');
+    if (statusElement) {
+        statusElement.textContent = 'Connected (Live Updates)';
+    }
+    addLogEntry("Real-time connection established with AI backend.");
+});
                 
-                socket.on('disconnect', () => {
-                    document.getElementById('connection-status-text').textContent = 'Disconnected';
-                    addLogEntry("Connection lost with AI backend. Retrying...");
-                });
+socket.on('disconnect', () => {
+    const statusElement = document.getElementById('connection-status-text');
+    if (statusElement) {
+        statusElement.textContent = 'Disconnected';
+    }
+    addLogEntry("Connection lost with AI backend. Retrying...");
+});
                 
                 socket.on('new_property', (property) => {
                     propertiesData.push(property);
@@ -2144,16 +2150,14 @@
             return originalAddPropertyToMap(fixPropertyCoordinates(property));
         };
 
-        // Also fix properties on load
-        const originalLoadProperties = loadProperties;
-        loadProperties = function() {
-            console.log("Loading properties with coordinate fixing");
-            return originalLoadProperties().then(function(result) {
-                // Fix coordinates in all loaded properties
-                propertiesData.forEach(fixPropertyCoordinates);
-                return result;
-            });
-        };
+// Also fix properties on load - but don't expect a Promise
+const originalLoadProperties = loadProperties;
+loadProperties = function() {
+    console.log("Loading properties with coordinate fixing");
+    originalLoadProperties();
+    // Fix coordinates in all loaded properties
+    propertiesData.forEach(fixPropertyCoordinates);
+};
     </script>
 
 </body>
