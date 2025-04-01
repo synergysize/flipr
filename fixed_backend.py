@@ -30,6 +30,8 @@ app = Flask(__name__, static_folder='.')
 # Allow specific origins for CORS - add your Vercel app URL here
 ALLOWED_ORIGINS = [
     "https://flipr-app.vercel.app",  # Replace with your actual Vercel app URL
+    "https://app.flipr.realty",      # Production domain
+    "http://app.flipr.realty",       # Production domain (http version)
     "http://localhost:3000",         # For local development
     "http://localhost:5173"          # For local Vite development
 ]
