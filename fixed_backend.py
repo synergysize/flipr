@@ -444,8 +444,8 @@ def handle_connect():
     emit('connection_status', {'status': 'connected'})
 
 # Replace with:
-# if __name__ == '__main__':
-#    init_db()
+ if __name__ == '__main__':
+    init_db()
     # Get port from environment variable for compatibility with hosting services
     # Use a different port to avoid conflicts
     port = int(os.environ.get("PORT", 5005))
@@ -458,7 +458,7 @@ def handle_connect():
     except:
         logging.warning("Could not write PID file (normal in production)")
     # Run with production settings when deployed
- #   if os.environ.get("PRODUCTION") == "true":
-   #     socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
- #   else:
-  #      socketio.run(app, host=host, port=port, debug=True, allow_unsafe_werkzeug=True)
+     if os.environ.get("PRODUCTION") == "true":
+         socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
+     else:
+         socketio.run(app, host=host, port=port, debug=True, allow_unsafe_werkzeug=True)
