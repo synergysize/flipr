@@ -85,6 +85,13 @@ else:
     # Fallback to SQLite for development if no PostgreSQL URL is provided
     USE_POSTGRES = bool(DB_URL)
 
+# IPv4 patch to force IPv4 connections
+import socket
+orig_getaddrinfo = socket.getaddrinfo
+def force_ipv4(*args, **kwargs):
+    return [info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET]
+socket.getaddrinfo = force_ipv4
+
 # Log connection method being used
 logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 DB_FILE = "properties.db"
