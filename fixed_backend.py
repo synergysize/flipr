@@ -35,11 +35,13 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",         # For local development
     "http://localhost:5173",          # For local Vite development
     "https://flipr-5.onrender.com",
-    "https://flipr-6.onrender.com"
+    "https://flipr-6.onrender.com",
+    "*"                              # Allow all origins in development mode
 ]
 
 CORS(app, origins=ALLOWED_ORIGINS)
-socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS)
+# For Gunicorn compatibility, we'll set async_mode to 'eventlet'
+socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode='eventlet')
 
 # Get from environment variable
 DB_URL = os.environ.get("DATABASE_URL", "")
@@ -568,10 +570,15 @@ def handle_connect():
     logging.info(f"Client connected: {request.sid}")
     emit('connection_status', {'status': 'connected'})
 
+# Initialize database when the module is loaded
+# This ensures the database is initialized whether run directly or by Gunicorn
+init_db()
+
+# This allows Gunicorn to import the app object for the production server
+# The app object needs to be accessible at the module level for Gunicorn to work
+
 if __name__ == '__main__':
-    init_db()
-    # Get port from environment variable for compatibility with hosting services
-    # Use a different port to avoid conflicts
+    # This block only executes when the script is run directly, not when imported by Gunicorn
     port = int(os.environ.get("PORT", 5005))
     host = '0.0.0.0'
     logging.info(f"Starting fixed backend server on http://{host}:{port}")
