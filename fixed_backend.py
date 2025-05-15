@@ -44,7 +44,7 @@ CORS(app, origins=ALLOWED_ORIGINS)
 socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode='eventlet')
 
 # Set the Supabase pooler URL - this is the correct URL that works on Render
-SUPABASE_POOLER_URL = "postgresql://postgres.utalravvcgiehxojrgba:GX0JblzDEbyYxi6k@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+SUPABASE_POOLER_URL = "postgresql://synergysize:GX0JblzDEbyYxi6k@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
 
 # Use the pooler URL by default, or let the environment override it
 DB_URL = os.environ.get("DATABASE_URL", SUPABASE_POOLER_URL)
@@ -186,6 +186,18 @@ def ipv4_psycopg2_connect(dsn, **kwargs):
         return orig_psycopg2_connect(dsn, **kwargs)
     except Exception as e:
         logging.error(f"Database connection error: {str(e)}")
+        
+        # Check for authentication errors (wrong username)
+        if "password authentication failed" in str(e).lower():
+            logging.error("Authentication failed - using username 'synergysize' for Supabase connection")
+            # Try to modify the connection string to use the correct username
+            if "postgres.utalravvcgiehxojrgba" in dsn:
+                fixed_dsn = dsn.replace("postgres.utalravvcgiehxojrgba", "synergysize")
+                logging.info(f"Attempting connection with corrected username: {fixed_dsn}")
+                try:
+                    return orig_psycopg2_connect(fixed_dsn, **kwargs)
+                except Exception as retry_e:
+                    logging.error(f"Connection with corrected username still failed: {str(retry_e)}")
         
         # If we're using the pooler URL, add extra diagnostic information
         if "aws-0-us-east-1.pooler.supabase.com" in dsn:
