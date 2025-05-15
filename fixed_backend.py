@@ -89,10 +89,71 @@ else:
 
 # IPv4 patch to force IPv4 connections
 import socket
+
+# Save the original getaddrinfo function
 orig_getaddrinfo = socket.getaddrinfo
+
+# This function will filter out IPv6 results and only return IPv4
 def force_ipv4(*args, **kwargs):
-    return [info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET]
+    # Force IPv4 by explicitly adding family=socket.AF_INET parameter
+    kwargs['family'] = socket.AF_INET
+    return orig_getaddrinfo(*args, **kwargs)
+
+# Replace the original getaddrinfo with our IPv4-only version
 socket.getaddrinfo = force_ipv4
+
+# Also create a more restrictive version of psycopg2.connect
+import psycopg2
+orig_psycopg2_connect = psycopg2.connect
+
+# Wrap psycopg2.connect to force IPv4
+def ipv4_psycopg2_connect(dsn, **kwargs):
+    if 'host=' in dsn:
+        # For connection strings in the "host=X port=Y..." format
+        params = {}
+        for param in dsn.split():
+            if '=' in param:
+                key, value = param.split('=', 1)
+                params[key] = value
+        
+        if 'host' in params:
+            # Get the IPv4 address for the hostname
+            logging.info(f"Resolving hostname {params['host']} to IPv4 address")
+            try:
+                # Force IPv4 address resolution
+                ipv4_addr = socket.gethostbyname(params['host'])
+                logging.info(f"Resolved to IPv4 address: {ipv4_addr}")
+                
+                # Replace the hostname with the IPv4 address in the connection string
+                dsn = dsn.replace(f"host={params['host']}", f"host={ipv4_addr}")
+            except Exception as e:
+                logging.warning(f"Failed to resolve hostname to IPv4: {str(e)}")
+    
+    elif '//' in dsn:
+        # For URLs like postgresql://username:password@hostname:port/database
+        try:
+            result = urllib.parse.urlparse(dsn)
+            if result.hostname:
+                logging.info(f"Resolving hostname {result.hostname} to IPv4 address")
+                # Force IPv4 address resolution
+                ipv4_addr = socket.gethostbyname(result.hostname)
+                logging.info(f"Resolved to IPv4 address: {ipv4_addr}")
+                
+                # Reconstruct the URL with the IPv4 address
+                netloc = result.netloc.replace(result.hostname, ipv4_addr)
+                new_url = urllib.parse.urlunparse((
+                    result.scheme, netloc, result.path,
+                    result.params, result.query, result.fragment
+                ))
+                dsn = new_url
+        except Exception as e:
+            logging.warning(f"Failed to modify URL to use IPv4: {str(e)}")
+    
+    # Call the original connect function with our potentially modified dsn
+    return orig_psycopg2_connect(dsn, **kwargs)
+
+# Replace psycopg2.connect with our IPv4-enforcing version
+psycopg2.connect = ipv4_psycopg2_connect
 
 # Log connection method being used
 logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
