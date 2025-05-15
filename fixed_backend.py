@@ -71,8 +71,20 @@ if DB_URL:
         logging.warning(f"Error parsing DATABASE_URL: {str(e)}")
         DB_URL = ""
 
-# Fallback to SQLite for development if no PostgreSQL URL is provided
-USE_POSTGRES = bool(DB_URL)
+# Check if SQLite fallback is disabled
+DISABLE_SQLITE_FALLBACK = os.environ.get("DISABLE_SQLITE_FALLBACK", "").lower() in ["true", "1", "yes"]
+IS_PRODUCTION = os.environ.get("PRODUCTION", "").lower() in ["true", "1", "yes"]
+
+# In production or if fallback is explicitly disabled, don't use SQLite
+if IS_PRODUCTION or DISABLE_SQLITE_FALLBACK:
+    USE_POSTGRES = True
+    if not DB_URL:
+        logging.error("PostgreSQL connection string (DATABASE_URL) is required in production mode")
+        raise ValueError("DATABASE_URL is required in production mode")
+else:
+    # Fallback to SQLite for development if no PostgreSQL URL is provided
+    USE_POSTGRES = bool(DB_URL)
+
 # Log connection method being used
 logging.info(f"DATABASE_URL is {'set' if DB_URL else 'not set'}, using {'PostgreSQL' if USE_POSTGRES else 'SQLite'}")
 DB_FILE = "properties.db"
@@ -153,32 +165,36 @@ def init_db():
             logging.info("PostgreSQL database initialized")
         except Exception as e:
             logging.error(f"Failed to initialize PostgreSQL database: {str(e)}")
-            logging.info("Falling back to SQLite database")
-            # Use nonlocal would be better but we're at module level
-            # Set the global variable to switch to SQLite
-            globals()['USE_POSTGRES'] = False
-            # Initialize SQLite instead
-            import sqlite3
-            with sqlite3.connect(DB_FILE) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                CREATE TABLE IF NOT EXISTS properties (
-                    id TEXT PRIMARY KEY,
-                    address TEXT,
-                    lat REAL,
-                    lng REAL,
-                    price REAL,
-                    bedrooms INTEGER,
-                    bathrooms REAL,
-                    intensity REAL,
-                    deal_rating TEXT,
-                    ai_evaluation_reasoning TEXT,
-                    property_data TEXT,
-                    timestamp INTEGER
-                )
-                ''')
-                conn.commit()
-            logging.info("SQLite database initialized (fallback mode)")
+            if IS_PRODUCTION or DISABLE_SQLITE_FALLBACK:
+                # In production, do not fall back to SQLite
+                raise
+            else:
+                # Only in development, fall back to SQLite
+                logging.info("Falling back to SQLite database in development mode")
+                # Set the global variable to switch to SQLite
+                globals()['USE_POSTGRES'] = False
+                # Initialize SQLite instead
+                import sqlite3
+                with sqlite3.connect(DB_FILE) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS properties (
+                        id TEXT PRIMARY KEY,
+                        address TEXT,
+                        lat REAL,
+                        lng REAL,
+                        price REAL,
+                        bedrooms INTEGER,
+                        bathrooms REAL,
+                        intensity REAL,
+                        deal_rating TEXT,
+                        ai_evaluation_reasoning TEXT,
+                        property_data TEXT,
+                        timestamp INTEGER
+                    )
+                    ''')
+                    conn.commit()
+                logging.info("SQLite database initialized (development fallback mode)")
     else:
         # SQLite initialization (for development)
         import sqlite3
@@ -316,14 +332,67 @@ def update_property():
 @app.route('/properties', methods=['GET'])
 def get_properties():
     try:
+        # Parse pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        
+        # Validate and sanitize inputs
+        page = max(1, page)  # Ensure page is at least 1
+        per_page = min(100, max(10, per_page))  # Between 10 and 100 items per page
+        
+        # Calculate offset
+        offset = (page - 1) * per_page
+        
+        # Get filters
+        price_min = request.args.get('price_min', type=float)
+        price_max = request.args.get('price_max', type=float)
+        bedrooms_min = request.args.get('bedrooms_min', type=int)
+        intensity_min = request.args.get('intensity_min', type=float)
+        
         conn = get_db_connection()
         try:
             properties = []
+            total_count = 0
             
             if USE_POSTGRES:
-                # PostgreSQL implementation
+                # PostgreSQL implementation with pagination
                 cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                cursor.execute('SELECT * FROM properties')
+                
+                # Build the query with filters
+                query = 'SELECT * FROM properties WHERE 1=1'
+                count_query = 'SELECT COUNT(*) FROM properties WHERE 1=1'
+                params = []
+                
+                if price_min is not None:
+                    query += ' AND price >= %s'
+                    count_query += ' AND price >= %s'
+                    params.append(price_min)
+                
+                if price_max is not None:
+                    query += ' AND price <= %s'
+                    count_query += ' AND price <= %s'
+                    params.append(price_max)
+                
+                if bedrooms_min is not None:
+                    query += ' AND bedrooms >= %s'
+                    count_query += ' AND bedrooms >= %s'
+                    params.append(bedrooms_min)
+                
+                if intensity_min is not None:
+                    query += ' AND intensity >= %s'
+                    count_query += ' AND intensity >= %s'
+                    params.append(intensity_min)
+                
+                # Add pagination
+                query += ' ORDER BY timestamp DESC LIMIT %s OFFSET %s'
+                params.extend([per_page, offset])
+                
+                # Get total count
+                cursor.execute(count_query, params[:-2] if params else None)
+                total_count = cursor.fetchone()[0]
+                
+                # Execute the main query
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
                 
                 for row in rows:
@@ -350,11 +419,46 @@ def get_properties():
                     
                     properties.append(prop)
             else:
-                # SQLite implementation
+                # SQLite implementation with pagination
                 import sqlite3
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute('SELECT * FROM properties')
+                
+                # Build the query with filters
+                query = 'SELECT * FROM properties WHERE 1=1'
+                count_query = 'SELECT COUNT(*) FROM properties WHERE 1=1'
+                params = []
+                
+                if price_min is not None:
+                    query += ' AND price >= ?'
+                    count_query += ' AND price >= ?'
+                    params.append(price_min)
+                
+                if price_max is not None:
+                    query += ' AND price <= ?'
+                    count_query += ' AND price <= ?'
+                    params.append(price_max)
+                
+                if bedrooms_min is not None:
+                    query += ' AND bedrooms >= ?'
+                    count_query += ' AND bedrooms >= ?'
+                    params.append(bedrooms_min)
+                
+                if intensity_min is not None:
+                    query += ' AND intensity >= ?'
+                    count_query += ' AND intensity >= ?'
+                    params.append(intensity_min)
+                
+                # Add pagination
+                query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?'
+                params.extend([per_page, offset])
+                
+                # Get total count
+                cursor.execute(count_query, params[:-2] if params else None)
+                total_count = cursor.fetchone()[0]
+                
+                # Execute the main query
+                cursor.execute(query, params)
                 rows = cursor.fetchall()
                 
                 for row in rows:
@@ -376,7 +480,21 @@ def get_properties():
                     
                     properties.append(prop)
             
-            return jsonify(properties)
+            # Prepare pagination metadata
+            total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
+            
+            # Return paginated response
+            return jsonify({
+                "properties": properties,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total_count": total_count,
+                    "total_pages": total_pages,
+                    "has_next": page < total_pages,
+                    "has_prev": page > 1
+                }
+            })
         finally:
             conn.close()
     
