@@ -1,0 +1,21 @@
+# Exported from Render on 2025-05-15T05:18:12Z
+services:
+- type: web
+  name: flipr-7
+  runtime: python
+  repo: https://github.com/synergysize/flipr
+  plan: free
+  envVars:
+  - key: DATABASE_URL
+    sync: false
+  - key: DISABLE_SQLITE_FALLBACK
+    value: "true"
+    sync: false
+  - key: PRODUCTION
+    value: "true"
+    sync: false
+  region: oregon
+  buildCommand: pip install -r requirements.txt
+  startCommand: gunicorn --worker-class eventlet -w 1 fixed_backend_websocket:app
+  autoDeployTrigger: commit
+version: "1"
