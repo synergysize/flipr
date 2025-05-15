@@ -568,7 +568,6 @@ def handle_connect():
     logging.info(f"Client connected: {request.sid}")
     emit('connection_status', {'status': 'connected'})
 
-# Replace with:
 if __name__ == '__main__':
     init_db()
     # Get port from environment variable for compatibility with hosting services
