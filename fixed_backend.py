@@ -44,7 +44,15 @@ CORS(app, origins=ALLOWED_ORIGINS)
 socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode='eventlet')
 
 # Get from environment variable
-DB_URL = os.environ.get("DATABASE_URL", "")
+# Use explicit Supabase pooler URL if environment doesn't specify one
+DEFAULT_DB_URL = "postgresql://postgres.utalravvcgiehxojrgba:GX0JblzDEbyYxi6k@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+DB_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
+
+# Log which database URL we're using
+if DB_URL == DEFAULT_DB_URL:
+    logging.info("Using default Supabase pooler connection URL")
+else:
+    logging.info("Using DATABASE_URL from environment")
 
 # Check for common mistakes in DATABASE_URL
 if DB_URL:
@@ -75,17 +83,20 @@ if DB_URL:
 
 # Check if SQLite fallback is disabled
 DISABLE_SQLITE_FALLBACK = os.environ.get("DISABLE_SQLITE_FALLBACK", "").lower() in ["true", "1", "yes"]
-IS_PRODUCTION = os.environ.get("PRODUCTION", "").lower() in ["true", "1", "yes"]
+# Default to production mode if not specified (safer approach for deployment)
+IS_PRODUCTION = os.environ.get("PRODUCTION", "true").lower() in ["true", "1", "yes"]
 
-# In production or if fallback is explicitly disabled, don't use SQLite
-if IS_PRODUCTION or DISABLE_SQLITE_FALLBACK:
-    USE_POSTGRES = True
-    if not DB_URL:
-        logging.error("PostgreSQL connection string (DATABASE_URL) is required in production mode")
-        raise ValueError("DATABASE_URL is required in production mode")
+# Always use PostgreSQL in production and with our default connection
+USE_POSTGRES = True
+
+# Log the mode we're running in
+if IS_PRODUCTION:
+    logging.info("Running in PRODUCTION mode")
 else:
-    # Fallback to SQLite for development if no PostgreSQL URL is provided
-    USE_POSTGRES = bool(DB_URL)
+    logging.info("Running in DEVELOPMENT mode")
+
+# Even in development mode, we'll use PostgreSQL with our default connection
+logging.info(f"Database connection configured to use PostgreSQL")
 
 # IPv4 patch to force IPv4 connections
 import socket
