@@ -43,16 +43,24 @@ CORS(app, origins=ALLOWED_ORIGINS)
 # For Gunicorn compatibility, we'll set async_mode to 'eventlet'
 socketio = SocketIO(app, cors_allowed_origins=ALLOWED_ORIGINS, async_mode='eventlet')
 
-# Get from environment variable
-# Use explicit Supabase pooler URL if environment doesn't specify one
-DEFAULT_DB_URL = "postgresql://postgres.utalravvcgiehxojrgba:GX0JblzDEbyYxi6k@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
-DB_URL = os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
+# Set the Supabase pooler URL - this is the correct URL that works on Render
+SUPABASE_POOLER_URL = "postgresql://postgres.utalravvcgiehxojrgba:GX0JblzDEbyYxi6k@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+
+# Use the pooler URL by default, or let the environment override it
+DB_URL = os.environ.get("DATABASE_URL", SUPABASE_POOLER_URL)
 
 # Log which database URL we're using
-if DB_URL == DEFAULT_DB_URL:
-    logging.info("Using default Supabase pooler connection URL")
+if DB_URL == SUPABASE_POOLER_URL:
+    logging.info("Using Supabase connection pooler URL (aws-0-us-east-1.pooler.supabase.com)")
 else:
     logging.info("Using DATABASE_URL from environment")
+    # Safety check - if environment URL contains the old host, replace it with the pooler
+    if "db.utalravvcgiehxojrgba.supabase.co" in DB_URL:
+        old_url = DB_URL
+        DB_URL = DB_URL.replace("db.utalravvcgiehxojrgba.supabase.co", "aws-0-us-east-1.pooler.supabase.com")
+        logging.warning(f"Replaced old Supabase host with pooler host in DATABASE_URL")
+        logging.warning(f"Old URL: {old_url}")
+        logging.warning(f"New URL: {DB_URL}")
 
 # Check for common mistakes in DATABASE_URL
 if DB_URL:
@@ -117,8 +125,17 @@ socket.getaddrinfo = force_ipv4
 import psycopg2
 orig_psycopg2_connect = psycopg2.connect
 
-# Wrap psycopg2.connect to force IPv4
+# Wrap psycopg2.connect to force IPv4 and handle Supabase connections properly
 def ipv4_psycopg2_connect(dsn, **kwargs):
+    # Replace any old Supabase references with the pooler URL
+    if "db.utalravvcgiehxojrgba.supabase.co" in dsn:
+        logging.warning("Found old Supabase host in connection string, replacing with pooler")
+        dsn = dsn.replace("db.utalravvcgiehxojrgba.supabase.co", "aws-0-us-east-1.pooler.supabase.com")
+    
+    # Ensure aws-0-us-east-1.pooler.supabase.com is accessed via IPv4
+    if "aws-0-us-east-1.pooler.supabase.com" in dsn:
+        logging.info("Detected Supabase pooler connection - ensuring IPv4 connectivity")
+    
     if 'host=' in dsn:
         # For connection strings in the "host=X port=Y..." format
         params = {}
@@ -139,6 +156,8 @@ def ipv4_psycopg2_connect(dsn, **kwargs):
                 dsn = dsn.replace(f"host={params['host']}", f"host={ipv4_addr}")
             except Exception as e:
                 logging.warning(f"Failed to resolve hostname to IPv4: {str(e)}")
+                if "aws-0-us-east-1.pooler.supabase.com" in params['host']:
+                    logging.error("Error resolving Supabase pooler hostname - this is critical for connectivity")
     
     elif '//' in dsn:
         # For URLs like postgresql://username:password@hostname:port/database
@@ -159,9 +178,28 @@ def ipv4_psycopg2_connect(dsn, **kwargs):
                 dsn = new_url
         except Exception as e:
             logging.warning(f"Failed to modify URL to use IPv4: {str(e)}")
+            if "aws-0-us-east-1.pooler.supabase.com" in result.hostname:
+                logging.error("Error resolving Supabase pooler hostname - this is critical for connectivity")
     
     # Call the original connect function with our potentially modified dsn
-    return orig_psycopg2_connect(dsn, **kwargs)
+    try:
+        return orig_psycopg2_connect(dsn, **kwargs)
+    except Exception as e:
+        logging.error(f"Database connection error: {str(e)}")
+        
+        # If we're using the pooler URL, add extra diagnostic information
+        if "aws-0-us-east-1.pooler.supabase.com" in dsn:
+            logging.error("Failed to connect to Supabase pooler - checking network connectivity")
+            try:
+                # Try to ping the pooler (this will fail in the container but gives more info)
+                import subprocess
+                subprocess.run(["ping", "-c", "1", "-4", "aws-0-us-east-1.pooler.supabase.com"], 
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+            except Exception as ping_error:
+                logging.error(f"Network diagnostic failed: {str(ping_error)}")
+        
+        # Re-raise the original error
+        raise
 
 # Replace psycopg2.connect with our IPv4-enforcing version
 psycopg2.connect = ipv4_psycopg2_connect
